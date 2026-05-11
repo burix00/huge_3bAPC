@@ -14,19 +14,16 @@ class RegisterController extends Controller
     public function __construct()
     {
         parent::__construct();
+        Auth::checkAdminAuthentication(); // only Admin access
     }
 
     /**
      * Register page
-     * Show the register form, but redirect to main-page if user is already logged-in
+     * Show the register form only to Admin
      */
     public function index()
     {
-        if (LoginModel::isUserLoggedIn()) {
-            Redirect::home();
-        } else {
-            $this->View->render('register/index');
-        }
+        $this->View->render('register/index');
     }
 
     /**
@@ -38,7 +35,7 @@ class RegisterController extends Controller
         $registration_successful = RegistrationModel::registerNewUser();
 
         if ($registration_successful) {
-            Redirect::to('login/index');
+            Redirect::to('admin/index');
         } else {
             Redirect::to('register/index');
         }

@@ -36,9 +36,6 @@
                 <li <?php if (View::checkForActiveControllerAndAction($filename, "login/index")) { echo ' class="active" '; } ?> >
                     <a href="<?php echo Config::get('URL'); ?>login/index">Login</a>
                 </li>
-                <li <?php if (View::checkForActiveControllerAndAction($filename, "register/index")) { echo ' class="active" '; } ?> >
-                    <a href="<?php echo Config::get('URL'); ?>register/index">Register</a>
-                </li>
             <?php } ?>
         </ul>
 
@@ -69,11 +66,17 @@
                 </ul>
             </li>
             <?php if (Session::get("user_account_type") == 7) : ?>
+                <li <?php if (View::checkForActiveController($filename, "register")) {
+                    echo ' class="active" ';
+                } ?> >
+                    <a href="<?php echo Config::get('URL'); ?>register/index">Register</a>
+                </li>
                 <li <?php if (View::checkForActiveController($filename, "admin")) {
                     echo ' class="active" ';
                 } ?> >
                     <a href="<?php echo Config::get('URL'); ?>admin/">Admin</a>
                 </li>
+                
             <?php endif; ?>
         <?php endif; ?>
         </ul>

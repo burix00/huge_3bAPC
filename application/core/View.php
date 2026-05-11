@@ -4,6 +4,7 @@
  * Class View
  * The part that handles all the output
  */
+#[AllowDynamicProperties]
 class View
 {
     /**
