@@ -20,12 +20,14 @@ class AdminController extends Controller
     public function index()
     {
         $this->View->render('admin/index', array(
-                'users' => UserModel::getPublicProfilesOfAllUsers())
-        );
+            'users' => UserModel::getPublicProfilesOfAllUsers(),
+            'roles' => AdminModel::getAllRoles(),   // new helper for user_roles
+        ));
     }
 
     public function actionAccountSettings()
     {
+        AdminModel::setUserRole(Request::post('user_id'), Request::post('role_id'));
         AdminModel::setAccountSuspensionAndDeletionStatus(
             Request::post('suspension'), Request::post('softDelete'), Request::post('user_id')
         );

@@ -92,4 +92,31 @@ class AdminModel
             return true;
         }
     }
+
+    /**
+     * Gets all roles
+     */
+    public static function getAllRoles()
+    {
+        $db = DatabaseFactory::getFactory()->getConnection();
+        $q  = $db->prepare("SELECT role_id, role_name FROM user_roles ORDER BY role_id");
+        $q->execute();
+        return $q->fetchAll();
+    }
+
+    /**
+     * Sets the user role
+     */
+    public static function setUserRole($userId, $roleId)
+    {
+        if ($userId == Session::get('user_id')) {
+            return false;
+        }
+        $database = DatabaseFactory::getFactory()->getConnection();
+        $query = $database->prepare(
+            "UPDATE users SET user_account_type = :role WHERE user_id = :id LIMIT 1"
+        );
+        $query->execute([':role' => (int)$roleId, ':id' => (int)$userId]);
+        return $query->rowCount() === 1;
+    }
 }

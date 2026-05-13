@@ -19,7 +19,11 @@ class UserModel
     {
         $database = DatabaseFactory::getFactory()->getConnection();
 
-        $sql = "SELECT user_id, user_name, user_email, user_active, user_has_avatar, user_deleted FROM users";
+        $sql = "SELECT u.user_id, u.user_name, u.user_email, u.user_active,
+               u.user_has_avatar, u.user_deleted, u.user_account_type,
+               r.role_name
+        FROM users u
+        LEFT JOIN user_roles r ON r.role_id = u.user_account_type";
         $query = $database->prepare($sql);
         $query->execute();
 
@@ -39,6 +43,8 @@ class UserModel
             $all_users_profiles[$user->user_id]->user_active = $user->user_active;
             $all_users_profiles[$user->user_id]->user_deleted = $user->user_deleted;
             $all_users_profiles[$user->user_id]->user_avatar_link = (Config::get('USE_GRAVATAR') ? AvatarModel::getGravatarLinkByEmail($user->user_email) : AvatarModel::getPublicAvatarFilePathOfUser($user->user_has_avatar, $user->user_id));
+            $all_users_profiles[$user->user_id]->user_account_type = $user->user_account_type;
+            $all_users_profiles[$user->user_id]->role_name = $user->role_name ?? $user->user_account_type;
         }
 
         return $all_users_profiles;
