@@ -63,11 +63,11 @@
                     </tr>
                 <?php } ?>
             </table>
-            <script>
-                $(document).ready(function() {
-                    $('#overviewTable').DataTable();
-                });
-            </script>
         </div>
     </div>
 </div>
+<script>
+    $(document).ready(function() {
+        $('#overviewTable').DataTable();
+    });
+</script>
