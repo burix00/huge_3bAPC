@@ -13,7 +13,7 @@
             or suspend a user.
         </div>
         <div>
-            <table class="overview-table">
+            <table class="overview-table" id="overviewTable">
                 <thead>
                 <tr>
                     <td>Id</td>
@@ -53,7 +53,7 @@
                                     <?php } ?>
                                 </select>
                             </td>
-                            <td><input type="number" name="suspension" /></td>
+                            <td><input type="number" name="suspension" min="0" max="9999"/></td>
                             <td><input type="checkbox" name="softDelete" <?php if ($user->user_deleted) { ?> checked <?php } ?> /></td>
                             <td>
                                 <input type="hidden" name="user_id" value="<?= $user->user_id; ?>" />
@@ -63,6 +63,11 @@
                     </tr>
                 <?php } ?>
             </table>
+            <script>
+                $(document).ready(function() {
+                    $('#overviewTable').DataTable();
+                });
+            </script>
         </div>
     </div>
 </div>
