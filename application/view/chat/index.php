@@ -26,7 +26,14 @@
                                 <img src="<?= $user->user_avatar_link; ?>" />
                             <?php } ?>
                         </td>
-                        <td><?= $user->user_name; ?></td>
+                        <td>
+                            <?= $user->user_name; ?>
+                            <?php if (!empty($this->unread_counts[$user->user_id])): ?>
+                                <span style="background:red; color:white; border-radius:50%; padding:2px 7px; font-size:12px; margin-left:5px;">
+                                    <?= $this->unread_counts[$user->user_id]; ?>
+                                </span>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <a href="<?= Config::get('URL') . 'profile/showProfile/' . $user->user_id; ?>">Profile</a>
                         </td>

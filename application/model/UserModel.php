@@ -51,6 +51,42 @@ class UserModel
     }
 
     /**
+     * Get public profiles of all users except the currently logged-in user
+     * @return array
+     */
+    public static function getPublicProfilesOfAllUsersExceptCurrentUser()
+    {
+        $database = DatabaseFactory::getFactory()->getConnection();
+
+        $sql = "SELECT u.user_id, u.user_name, u.user_email, u.user_active,
+               u.user_has_avatar, u.user_deleted, u.user_account_type,
+               r.role_name
+        FROM users u
+        LEFT JOIN user_roles r ON r.role_id = u.user_account_type
+        WHERE u.user_id != :user_id";
+        $query = $database->prepare($sql);
+        $query->execute(array(':user_id' => Session::get('user_id')));
+
+        $all_users_profiles = array();
+
+        foreach ($query->fetchAll() as $user) {
+            array_walk_recursive($user, 'Filter::XSSFilter');
+
+            $all_users_profiles[$user->user_id] = new stdClass();
+            $all_users_profiles[$user->user_id]->user_id = $user->user_id;
+            $all_users_profiles[$user->user_id]->user_name = $user->user_name;
+            $all_users_profiles[$user->user_id]->user_email = $user->user_email;
+            $all_users_profiles[$user->user_id]->user_active = $user->user_active;
+            $all_users_profiles[$user->user_id]->user_deleted = $user->user_deleted;
+            $all_users_profiles[$user->user_id]->user_avatar_link = (Config::get('USE_GRAVATAR') ? AvatarModel::getGravatarLinkByEmail($user->user_email) : AvatarModel::getPublicAvatarFilePathOfUser($user->user_has_avatar, $user->user_id));
+            $all_users_profiles[$user->user_id]->user_account_type = $user->user_account_type;
+            $all_users_profiles[$user->user_id]->role_name = $user->role_name ?? $user->user_account_type;
+        }
+
+        return $all_users_profiles;
+    }
+
+    /**
      * Gets a user's profile data, according to the given $user_id
      * @param int $user_id The user's id
      * @return mixed The selected user's profile

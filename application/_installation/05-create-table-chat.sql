@@ -1,11 +1,10 @@
 CREATE TABLE IF NOT EXISTS `huge`.`chat` (
-    `chat_id` int(11)  NOT NULL AUTO_INCREMENT,
-    `sender_user_id` int(11) NOT NULL,
-    `receiver_user_id` int(11)  NOT NULL,
-    `message_text` text NOT NULL,
-    `sent_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `is_read` TINYINT(1) NOT NULL DEFAULT 0,
+    `chat_id` int(11) NOT NULL AUTO_INCREMENT,
+    `user1_id` int(11) NOT NULL,
+    `user2_id` int(11) NOT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`chat_id`),
-    FOREIGN KEY (`sender_user_id`) REFERENCES `huge`.`users`(`user_id`) ON DELETE CASCADE,
-    FOREIGN KEY (`receiver_user_id`) REFERENCES `huge`.`users`(`user_id`) ON DELETE CASCADE
+    UNIQUE KEY `unique_chat` (`user1_id`, `user2_id`),
+    FOREIGN KEY (`user1_id`) REFERENCES `huge`.`users`(`user_id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user2_id`) REFERENCES `huge`.`users`(`user_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
