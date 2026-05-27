@@ -19,8 +19,8 @@
 
         <form method="post" action="<?php echo Config::get('URL'); ?>chat/send/<?php echo (int)$this->receiver->user_id; ?>">
             <input type="hidden" name="csrf_token" value="<?php echo Csrf::makeToken(); ?>" />
-            <textarea style="width: 95%;" name="message_text" placeholder="Type a message..." required></textarea>
-            <input type="submit" value="Send" />
+            <textarea style="width: 100%;" name="message_text" placeholder="Type a message..." required></textarea>
+            <input style="width: 30%" type="submit" value="Send" />
         </form>
 
     </div>
