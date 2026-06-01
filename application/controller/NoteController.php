@@ -48,7 +48,8 @@ class NoteController extends Controller
     public function edit($note_id)
     {
         $this->View->render('note/edit', array(
-            'note' => NoteModel::getNote($note_id)
+            // 'note' => NoteModel::getNote($note_id)
+            'note' => NoteModel::getNoteMySqli($note_id)
         ));
     }
 
