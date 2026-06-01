@@ -37,7 +37,8 @@
                 <li <?php if (View::checkForActiveController($filename, "note")) { echo ' class="active" '; } ?> >
                     <a href="<?php echo Config::get('URL'); ?>note/index">My Notes</a>
                 </li>
-                <li <?php if (View::checkForActiveController($filename, "chat")) { echo ' class="active" '; } ?> >
+                <?php /* [KI-generiert – Claude Opus 4.7] Messenger umfasst 1:1-Chats und Gruppenchats */ ?>
+                <li <?php if (View::checkForActiveController($filename, "chat") || View::checkForActiveController($filename, "group")) { echo ' class="active" '; } ?> >
                     <a href="<?php echo Config::get('URL'); ?>chat/index">Messenger</a>
                 </li>
             <?php } else { ?>

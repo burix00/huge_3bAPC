@@ -22,9 +22,14 @@ class ChatController extends Controller
      */
     public function index()
     {
+        // [KI-generiert – Claude Opus 4.7] Messenger enthält jetzt zusätzlich Gruppenchats + Erstell-Formular
+        $userId = Session::get('user_id');
+        $users  = UserModel::getPublicProfilesOfAllUsersExceptCurrentUser();
         $this->View->render('chat/index', array(
-            'users' => UserModel::getPublicProfilesOfAllUsersExceptCurrentUser(),
-            'unread_counts' => ChatModel::getUnreadCountsPerUser()
+            'users'         => $users,
+            'unread_counts' => ChatModel::getUnreadCountsPerUser(),
+            'groups'        => GroupModel::getGroupsForUser($userId),
+            'all_users'     => $users,
         ));
     }
 
