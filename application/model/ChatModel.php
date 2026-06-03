@@ -12,23 +12,17 @@ class ChatModel
         $database = DatabaseFactory::getFactory()->getConnection();
         $user_id = Session::get('user_id');
 
-        $u1 = min($user_id, $receiver_id);
-        $u2 = max($user_id, $receiver_id);
-
-        $sql = "SELECT chat_id FROM chat WHERE user1_id = :u1 AND user2_id = :u2 LIMIT 1";
+        $sql = "CALL get_or_create_chat(:user_id, :receiver_id, @chat_id)";
         $query = $database->prepare($sql);
-        $query->execute(array(':u1' => $u1, ':u2' => $u2));
-        $chat = $query->fetch();
+        $query->execute([
+            ':user_id'     => $user_id,
+            ':receiver_id' => $receiver_id
+        ]);
+        $query->closeCursor();
 
-        if ($chat) {
-            return $chat->chat_id;
-        }
+        $result = $database->query("SELECT @chat_id AS chat_id")->fetch();
 
-        $sql = "INSERT INTO chat (user1_id, user2_id) VALUES (:u1, :u2)";
-        $query = $database->prepare($sql);
-        $query->execute(array(':u1' => $u1, ':u2' => $u2));
-
-        return $query->rowCount() == 1 ? $database->lastInsertId() : false;
+        return ($result && $result->chat_id !== null) ? (int)$result->chat_id : false;
     }
 
     /**
