@@ -44,12 +44,10 @@ class ChatModel
         }
 
         $database = DatabaseFactory::getFactory()->getConnection();
-
-        $sql = "SELECT message_id, sender_user_id, receiver_user_id, message_text, sent_at, is_read
-                FROM messages
-                WHERE chat_id = :chat_id
-                ORDER BY sent_at ASC";
+        
+        $sql = "CALL get_messages(:chat_id)";
         $query = $database->prepare($sql);
+        
         $query->execute(array(':chat_id' => $chat_id));
 
         return $query->fetchAll();
