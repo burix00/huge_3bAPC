@@ -66,8 +66,7 @@ class ChatModel
 
         $database = DatabaseFactory::getFactory()->getConnection();
 
-        $sql = "INSERT INTO messages (chat_id, sender_user_id, receiver_user_id, message_text)
-                VALUES (:chat_id, :sender_id, :receiver_id, :message_text)";
+        $sql = "CALL send_message(:chat_id, :sender_id, :receiver_id, :message_text)";
         $query = $database->prepare($sql);
         $query->execute(array(
             ':chat_id'      => $chat_id,
@@ -88,8 +87,7 @@ class ChatModel
     {
         $database = DatabaseFactory::getFactory()->getConnection();
 
-        $sql = "UPDATE messages SET is_read = 1
-                WHERE sender_user_id = :sender_id AND receiver_user_id = :user_id AND is_read = 0";
+        $sql = "CALL mark_as_read(:sender_id, :user_id)";
         $query = $database->prepare($sql);
         $query->execute(array(
             ':sender_id' => $sender_id,
@@ -107,10 +105,7 @@ class ChatModel
     {
         $database = DatabaseFactory::getFactory()->getConnection();
 
-        $sql = "SELECT sender_user_id, COUNT(*) AS unread_count
-                FROM messages
-                WHERE receiver_user_id = :user_id AND is_read = 0
-                GROUP BY sender_user_id";
+        $sql = "CALL get_unread_counts(:user_id)";
         $query = $database->prepare($sql);
         $query->execute([':user_id' => Session::get('user_id')]);
 
