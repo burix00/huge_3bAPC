@@ -44,8 +44,12 @@ class VideoModel
             return false;
         }
 
-        $title       = trim(Filter::XSSFilter($_POST['video_title'] ?? ''));
-        $description = trim(Filter::XSSFilter($_POST['video_description'] ?? ''));
+        $title       = $_POST['video_title'] ?? '';
+        $description = $_POST['video_description'] ?? '';
+        Filter::XSSFilter($title);
+        Filter::XSSFilter($description);
+        $title       = trim($title);
+        $description = trim($description);
         $userId      = Session::get('user_id');
 
         if (empty($title)) {
