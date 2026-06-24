@@ -15,6 +15,54 @@ class VideoModel
     /** Maximum upload size for chunked uploads: 10 GB */
     private static $maxChunkedFileSize = 10737418240;
 
+    /** Allowed MIME types for thumbnails */
+    private static $allowedThumbMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+    /** Maximum thumbnail file size: 5 MB */
+    private static $maxThumbSize = 5242880;
+
+    /**
+     * Save a thumbnail image to the user's video directory.
+     * Validates MIME type and size. Returns the stored filename on success, null on failure (non-fatal).
+     *
+     * @param  string $sourcePath     Absolute path to the source image.
+     * @param  int    $userId         Owning user ID.
+     * @param  string $storedName     The video's stored filename (used to derive the thumb name).
+     * @param  bool   $isUploadedFile Use move_uploaded_file (true) or rename (false).
+     * @return string|null
+     */
+    private static function saveThumbnail($sourcePath, $userId, $storedName, $isUploadedFile = true)
+    {
+        if (!file_exists($sourcePath) || filesize($sourcePath) > self::$maxThumbSize) {
+            return null;
+        }
+
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime  = $finfo->file($sourcePath);
+
+        if (!in_array($mime, self::$allowedThumbMimeTypes, true)) {
+            return null;
+        }
+
+        $extMap    = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'];
+        $ext       = $extMap[$mime];
+        $thumbName = pathinfo($storedName, PATHINFO_FILENAME) . '_thumb.' . $ext;
+        $userDir   = Config::get('PATH_USERVIDEOS') . $userId . DIRECTORY_SEPARATOR;
+
+        if (!is_dir($userDir)) {
+            if (!mkdir($userDir, 0750, true)) {
+                return null;
+            }
+        }
+
+        $targetPath = $userDir . $thumbName;
+        $success    = $isUploadedFile
+            ? move_uploaded_file($sourcePath, $targetPath)
+            : rename($sourcePath, $targetPath);
+
+        return $success ? $thumbName : null;
+    }
+
     /**
      * Upload a video for the currently logged-in user.
      * Validates MIME type and file size, sanitizes the filename, moves the file
@@ -85,10 +133,16 @@ class VideoModel
             return false;
         }
 
+        // Handle optional thumbnail upload (non-fatal: proceed without it on failure)
+        $thumbName = null;
+        if (isset($_FILES['video_thumbnail']) && $_FILES['video_thumbnail']['error'] === UPLOAD_ERR_OK) {
+            $thumbName = self::saveThumbnail($_FILES['video_thumbnail']['tmp_name'], $userId, $storedName, true);
+        }
+
         // Insert record into database
         $mysqli   = DatabaseFactoryMySqli::getFactory()->getConnectionMySqli();
-        $sql      = "INSERT INTO videos (user_id, title, description, file_name, mime_type, file_size)
-                     VALUES (?, ?, ?, ?, ?, ?)";
+        $sql      = "INSERT INTO videos (user_id, title, description, thumbnail, file_name, mime_type, file_size)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)";
         $stmt     = $mysqli->prepare($sql);
         if (!$stmt) {
             unlink($targetPath);
@@ -97,7 +151,7 @@ class VideoModel
         }
 
         $fileSize = (int) $_FILES['video_file']['size'];
-        $stmt->bind_param("issssi", $userId, $title, $description, $storedName, $mime, $fileSize);
+        $stmt->bind_param("isssssi", $userId, $title, $description, $thumbName, $storedName, $mime, $fileSize);
         $stmt->execute();
 
         if ($stmt->affected_rows !== 1) {
@@ -118,7 +172,7 @@ class VideoModel
     public static function getMyVideos()
     {
         $mysqli = DatabaseFactoryMySqli::getFactory()->getConnectionMySqli();
-        $sql    = "SELECT video_id, user_id, title, description, file_name, mime_type, file_size,
+        $sql    = "SELECT video_id, user_id, title, description, thumbnail, file_name, mime_type, file_size,
                           is_published, created_at
                    FROM videos
                    WHERE user_id = ?
@@ -144,7 +198,7 @@ class VideoModel
     public static function getPublishedVideos()
     {
         $mysqli = DatabaseFactoryMySqli::getFactory()->getConnectionMySqli();
-        $sql    = "SELECT v.video_id, v.user_id, v.title, v.description, v.file_name, v.mime_type,
+        $sql    = "SELECT v.video_id, v.user_id, v.title, v.description, v.thumbnail, v.file_name, v.mime_type,
                           v.file_size, v.created_at, u.user_name
                    FROM videos v
                    JOIN users u ON v.user_id = u.user_id
@@ -170,7 +224,7 @@ class VideoModel
     public static function searchPublishedVideos($query)
     {
         $mysqli = DatabaseFactoryMySqli::getFactory()->getConnectionMySqli();
-        $sql    = "SELECT v.video_id, v.user_id, v.title, v.description, v.file_name, v.mime_type,
+        $sql    = "SELECT v.video_id, v.user_id, v.title, v.description, v.thumbnail, v.file_name, v.mime_type,
                           v.file_size, v.created_at, u.user_name
                    FROM videos v
                    JOIN users u ON v.user_id = u.user_id
@@ -197,7 +251,7 @@ class VideoModel
     public static function getVideoById($videoId)
     {
         $mysqli = DatabaseFactoryMySqli::getFactory()->getConnectionMySqli();
-        $sql    = "SELECT video_id, user_id, title, description, file_name, mime_type, file_size,
+        $sql    = "SELECT video_id, user_id, title, description, thumbnail, file_name, mime_type, file_size,
                           is_published, created_at
                    FROM videos
                    WHERE video_id = ?
@@ -221,7 +275,7 @@ class VideoModel
         $userId = Session::get('user_id');
 
         $mysqli = DatabaseFactoryMySqli::getFactory()->getConnectionMySqli();
-        $sql    = "SELECT video_id, user_id, file_name FROM videos WHERE video_id = ? AND user_id = ? LIMIT 1";
+        $sql    = "SELECT video_id, user_id, file_name, thumbnail FROM videos WHERE video_id = ? AND user_id = ? LIMIT 1";
         $stmt   = $mysqli->prepare($sql);
         $stmt->bind_param("ii", $videoId, $userId);
         $stmt->execute();
@@ -236,6 +290,14 @@ class VideoModel
         $filePath = Config::get('PATH_USERVIDEOS') . $userId . '/' . $video->file_name;
         if (file_exists($filePath)) {
             unlink($filePath);
+        }
+
+        // Delete thumbnail file if present
+        if (!empty($video->thumbnail)) {
+            $thumbPath = Config::get('PATH_USERVIDEOS') . $userId . '/' . $video->thumbnail;
+            if (file_exists($thumbPath)) {
+                unlink($thumbPath);
+            }
         }
 
         // Remove user directory if now empty
@@ -337,6 +399,11 @@ class VideoModel
             }
         }
 
+        // On first chunk: save optional thumbnail to temp location for use on final chunk
+        if ($chunkIndex === 0 && isset($_FILES['video_thumbnail']) && $_FILES['video_thumbnail']['error'] === UPLOAD_ERR_OK) {
+            move_uploaded_file($_FILES['video_thumbnail']['tmp_name'], $tmpDir . $userId . '_' . $uploadUuid . '_thumb');
+        }
+
         // ── write chunk ──────────────────────────────────────────────────────
         $mode = ($chunkIndex === 0) ? 'wb' : 'ab';
         $out  = fopen($tmpFile, $mode);
@@ -398,6 +465,13 @@ class VideoModel
             return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_CHUNK_FINALIZE_FAILED')];
         }
 
+        // Retrieve thumbnail saved on chunk 0 (if any) and move to final location
+        $thumbName    = null;
+        $tmpThumbFile = $tmpDir . $userId . '_' . $uploadUuid . '_thumb';
+        if (file_exists($tmpThumbFile)) {
+            $thumbName = self::saveThumbnail($tmpThumbFile, $userId, $storedName, false);
+        }
+
         // Collect title / description (sent on every chunk)
         $title       = trim(filter_input(INPUT_POST, 'video_title') ?? '');
         $description = trim(filter_input(INPUT_POST, 'video_description') ?? '');
@@ -411,8 +485,8 @@ class VideoModel
 
         // Insert DB record
         $mysqli = DatabaseFactoryMySqli::getFactory()->getConnectionMySqli();
-        $sql    = "INSERT INTO videos (user_id, title, description, file_name, mime_type, file_size)
-                   VALUES (?, ?, ?, ?, ?, ?)";
+        $sql    = "INSERT INTO videos (user_id, title, description, thumbnail, file_name, mime_type, file_size)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)";
         $stmt   = $mysqli->prepare($sql);
         if (!$stmt) {
             unlink($finalPath);
@@ -420,7 +494,7 @@ class VideoModel
         }
 
         $fileSize = (int) $assembledSize;
-        $stmt->bind_param("issssi", $userId, $title, $description, $storedName, $mime, $fileSize);
+        $stmt->bind_param("isssssi", $userId, $title, $description, $thumbName, $storedName, $mime, $fileSize);
         $stmt->execute();
 
         if ($stmt->affected_rows !== 1) {

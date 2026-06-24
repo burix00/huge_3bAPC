@@ -31,6 +31,45 @@ class VideoController extends Controller
         ));
     }
 
+    public function thumbnail($videoId)
+    {
+        $video = VideoModel::getVideoById((int) $videoId);
+
+        if (!$video || empty($video->thumbnail)) {
+            http_response_code(404);
+            exit();
+        }
+
+        // Allow access for published videos; private videos require the owner
+        if (!$video->is_published) {
+            $userId = Session::get('user_id');
+            if (!$userId || (int) $userId !== (int) $video->user_id) {
+                http_response_code(403);
+                exit();
+            }
+        }
+
+        $baseDir   = realpath(Config::get('PATH_USERVIDEOS'));
+        $thumbPath = realpath(Config::get('PATH_USERVIDEOS') . $video->user_id . DIRECTORY_SEPARATOR . $video->thumbnail);
+
+        // Guard against path traversal
+        if ($thumbPath === false || $baseDir === false || strpos($thumbPath, $baseDir) !== 0) {
+            http_response_code(404);
+            exit();
+        }
+
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime  = $finfo->file($thumbPath);
+
+        while (ob_get_level()) { ob_end_clean(); }
+
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . filesize($thumbPath));
+        header('Cache-Control: public, max-age=86400');
+        readfile($thumbPath);
+        exit();
+    }
+
     public function stream($videoId)
     {
         Auth::checkAuthentication();
