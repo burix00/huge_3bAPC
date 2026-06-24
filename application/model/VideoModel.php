@@ -9,8 +9,11 @@ class VideoModel
     /** Allowed MIME types for upload */
     private static $allowedMimeTypes = ['video/mp4', 'video/webm', 'video/ogg'];
 
-    /** Maximum upload size: 200 MB */
+    /** Maximum upload size for single-request uploads: 200 MB */
     private static $maxFileSize = 209715200;
+
+    /** Maximum upload size for chunked uploads: 10 GB */
+    private static $maxChunkedFileSize = 10737418240;
 
     /**
      * Upload a video for the currently logged-in user.
@@ -158,6 +161,34 @@ class VideoModel
     }
 
     /**
+     * Search published videos by title or description.
+     * Uses parameterized LIKE to prevent SQL injection.
+     *
+     * @param  string $query  The search term.
+     * @return array
+     */
+    public static function searchPublishedVideos($query)
+    {
+        $mysqli = DatabaseFactoryMySqli::getFactory()->getConnectionMySqli();
+        $sql    = "SELECT v.video_id, v.user_id, v.title, v.description, v.file_name, v.mime_type,
+                          v.file_size, v.created_at, u.user_name
+                   FROM videos v
+                   JOIN users u ON v.user_id = u.user_id
+                   WHERE v.is_published = 1
+                     AND (v.title LIKE CONCAT('%', ?, '%') OR v.description LIKE CONCAT('%', ?, '%'))
+                   ORDER BY v.created_at DESC";
+        $stmt   = $mysqli->prepare($sql);
+        $stmt->bind_param("ss", $query, $query);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rows   = [];
+        while ($row = $result->fetch_object()) {
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
+    /**
      * Get a single video record by its ID.
      *
      * @param  int $videoId
@@ -250,5 +281,240 @@ class VideoModel
 
         Session::add('feedback_positive', Text::get('FEEDBACK_VIDEO_PUBLISH_TOGGLED'));
         return true;
+    }
+
+    /**
+     * Receive one chunk of a chunked video upload, append it to a temp file,
+     * and on the final chunk assemble + validate + move + insert the DB record.
+     *
+     * @return array  ['status' => 'ok'|'done'|'error', ...]
+     */
+    public static function uploadChunk()
+    {
+        $userId = Session::get('user_id');
+
+        // ── validate numeric inputs ──────────────────────────────────────────
+        $chunkIndex  = filter_input(INPUT_POST, 'chunkIndex',  FILTER_VALIDATE_INT);
+        $totalChunks = filter_input(INPUT_POST, 'totalChunks', FILTER_VALIDATE_INT);
+        $totalSize   = filter_input(INPUT_POST, 'totalSize',   FILTER_VALIDATE_INT);
+
+        if ($chunkIndex === false || $chunkIndex === null ||
+            $totalChunks === false || $totalChunks === null || $totalChunks < 1 ||
+            $totalSize   === false || $totalSize   === null || $totalSize   < 1) {
+            return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_CHUNK_INVALID')];
+        }
+
+        // ── sanitize uploadUuid (alphanumeric + hyphens only – prevents path traversal) ──
+        $rawUuid    = filter_input(INPUT_POST, 'uploadUuid') ?? '';
+        $uploadUuid = preg_replace('/[^a-zA-Z0-9-]/', '', $rawUuid);
+        if (empty($uploadUuid)) {
+            return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_CHUNK_INVALID')];
+        }
+
+        // ── validate chunk file ──────────────────────────────────────────────
+        if (!isset($_FILES['file_chunk']) || $_FILES['file_chunk']['error'] !== UPLOAD_ERR_OK) {
+            return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_CHUNK_INVALID')];
+        }
+
+        // ── on first chunk: validate title + total size ──────────────────────
+        if ($chunkIndex === 0) {
+            $title = trim(filter_input(INPUT_POST, 'video_title') ?? '');
+            if (empty($title)) {
+                return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_UPLOAD_NO_TITLE')];
+            }
+            if ($totalSize > self::$maxChunkedFileSize) {
+                return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_UPLOAD_TOO_BIG_CHUNKED')];
+            }
+        }
+
+        // ── temp file path ───────────────────────────────────────────────────
+        $tmpDir  = Config::get('PATH_USERVIDEOS') . 'tmp' . DIRECTORY_SEPARATOR;
+        $tmpFile = $tmpDir . $userId . '_' . $uploadUuid . '.tmp';
+
+        if (!is_dir($tmpDir)) {
+            if (!mkdir($tmpDir, 0750, true)) {
+                return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_FOLDER_NOT_WRITABLE')];
+            }
+        }
+
+        // ── write chunk ──────────────────────────────────────────────────────
+        $mode = ($chunkIndex === 0) ? 'wb' : 'ab';
+        $out  = fopen($tmpFile, $mode);
+        if (!$out) {
+            return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_CHUNK_WRITE_FAILED')];
+        }
+        $in = fopen($_FILES['file_chunk']['tmp_name'], 'rb');
+        if (!$in) {
+            fclose($out);
+            return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_CHUNK_WRITE_FAILED')];
+        }
+        while ($buf = fread($in, 65536)) {
+            fwrite($out, $buf);
+        }
+        fclose($in);
+        fclose($out);
+
+        // ── not the last chunk – return progress ─────────────────────────────
+        if ($chunkIndex < $totalChunks - 1) {
+            return ['status' => 'ok', 'chunk' => $chunkIndex];
+        }
+
+        // ══ FINAL CHUNK: assemble + validate + move + insert DB ══════════════
+
+        // Validate assembled file size
+        $assembledSize = filesize($tmpFile);
+        if ($assembledSize > self::$maxChunkedFileSize) {
+            unlink($tmpFile);
+            return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_UPLOAD_TOO_BIG_CHUNKED')];
+        }
+
+        // Validate MIME type from assembled file content (never trust client)
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime  = $finfo->file($tmpFile);
+        if (!in_array($mime, self::$allowedMimeTypes, true)) {
+            unlink($tmpFile);
+            return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_UPLOAD_WRONG_TYPE')];
+        }
+
+        // Sanitize original filename and generate unique stored name
+        $originalName = basename(filter_input(INPUT_POST, 'originalName') ?? 'video.mp4');
+        $sanitized    = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
+        $storedName   = time() . '_' . $sanitized;
+
+        // Ensure user directory exists
+        $userDir = Config::get('PATH_USERVIDEOS') . $userId . DIRECTORY_SEPARATOR;
+        if (!is_dir($userDir)) {
+            if (!mkdir($userDir, 0750, true)) {
+                unlink($tmpFile);
+                return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_FOLDER_NOT_WRITABLE')];
+            }
+        }
+
+        $finalPath = $userDir . $storedName;
+
+        // Atomic rename (same filesystem)
+        if (!rename($tmpFile, $finalPath)) {
+            unlink($tmpFile);
+            return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_CHUNK_FINALIZE_FAILED')];
+        }
+
+        // Collect title / description (sent on every chunk)
+        $title       = trim(filter_input(INPUT_POST, 'video_title') ?? '');
+        $description = trim(filter_input(INPUT_POST, 'video_description') ?? '');
+        Filter::XSSFilter($title);
+        Filter::XSSFilter($description);
+
+        if (empty($title)) {
+            unlink($finalPath);
+            return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_UPLOAD_NO_TITLE')];
+        }
+
+        // Insert DB record
+        $mysqli = DatabaseFactoryMySqli::getFactory()->getConnectionMySqli();
+        $sql    = "INSERT INTO videos (user_id, title, description, file_name, mime_type, file_size)
+                   VALUES (?, ?, ?, ?, ?, ?)";
+        $stmt   = $mysqli->prepare($sql);
+        if (!$stmt) {
+            unlink($finalPath);
+            return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_CHUNK_FINALIZE_FAILED')];
+        }
+
+        $fileSize = (int) $assembledSize;
+        $stmt->bind_param("issssi", $userId, $title, $description, $storedName, $mime, $fileSize);
+        $stmt->execute();
+
+        if ($stmt->affected_rows !== 1) {
+            unlink($finalPath);
+            return ['status' => 'error', 'message' => Text::get('FEEDBACK_VIDEO_CHUNK_FINALIZE_FAILED')];
+        }
+
+        return ['status' => 'done'];
+    }
+
+    /**
+     * Cast or change a rating (like/dislike) for a video by the current user.
+     * Re-clicking the same vote removes it (toggle off). Each user can only ever
+     * have one row per video (enforced by the composite primary key).
+     *
+     * @param  int  $videoId
+     * @param  bool $isLike   true = like, false = dislike
+     * @return array  ['status' => 'ok', 'likes' => N, 'dislikes' => N, 'userVote' => 1|0|null]
+     */
+    public static function rate($videoId, $isLike)
+    {
+        $userId  = Session::get('user_id');
+        $mysqli  = DatabaseFactoryMySqli::getFactory()->getConnectionMySqli();
+        $likeVal = $isLike ? 1 : 0;
+
+        // Find existing vote
+        $sql  = "SELECT is_like FROM video_ratings WHERE video_id = ? AND user_id = ? LIMIT 1";
+        $stmt = $mysqli->prepare($sql);
+        $stmt->bind_param("ii", $videoId, $userId);
+        $stmt->execute();
+        $existing = $stmt->get_result()->fetch_object();
+
+        if ($existing && (int) $existing->is_like === $likeVal) {
+            // Same vote clicked again -> remove it (toggle off)
+            $del = $mysqli->prepare("DELETE FROM video_ratings WHERE video_id = ? AND user_id = ? LIMIT 1");
+            $del->bind_param("ii", $videoId, $userId);
+            $del->execute();
+        } else {
+            // Insert new or switch existing vote
+            $up = $mysqli->prepare(
+                "INSERT INTO video_ratings (video_id, user_id, is_like) VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE is_like = VALUES(is_like)"
+            );
+            $up->bind_param("iii", $videoId, $userId, $likeVal);
+            $up->execute();
+        }
+
+        $counts = self::getRatingCounts($videoId);
+        return [
+            'status'   => 'ok',
+            'likes'    => $counts['likes'],
+            'dislikes' => $counts['dislikes'],
+            'userVote' => self::getUserVote($videoId, $userId),
+        ];
+    }
+
+    /**
+     * Get like/dislike totals for a video.
+     *
+     * @param  int $videoId
+     * @return array ['likes' => int, 'dislikes' => int]
+     */
+    public static function getRatingCounts($videoId)
+    {
+        $mysqli = DatabaseFactoryMySqli::getFactory()->getConnectionMySqli();
+        $sql    = "SELECT
+                        SUM(CASE WHEN is_like = 1 THEN 1 ELSE 0 END) AS likes,
+                        SUM(CASE WHEN is_like = 0 THEN 1 ELSE 0 END) AS dislikes
+                   FROM video_ratings WHERE video_id = ?";
+        $stmt   = $mysqli->prepare($sql);
+        $stmt->bind_param("i", $videoId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_object();
+        return [
+            'likes'    => (int) ($row->likes ?? 0),
+            'dislikes' => (int) ($row->dislikes ?? 0),
+        ];
+    }
+
+    /**
+     * Get the current user's vote on a video.
+     *
+     * @param  int $videoId
+     * @param  int $userId
+     * @return int|null  1 = like, 0 = dislike, null = no vote
+     */
+    public static function getUserVote($videoId, $userId)
+    {
+        $mysqli = DatabaseFactoryMySqli::getFactory()->getConnectionMySqli();
+        $sql    = "SELECT is_like FROM video_ratings WHERE video_id = ? AND user_id = ? LIMIT 1";
+        $stmt   = $mysqli->prepare($sql);
+        $stmt->bind_param("ii", $videoId, $userId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_object();
+        return $row ? (int) $row->is_like : null;
     }
 }
