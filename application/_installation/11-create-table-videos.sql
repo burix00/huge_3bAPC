@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS `huge`.`videos` (
   `user_id` int(11) NOT NULL,
   `title` varchar(255) NOT NULL,
   `description` text,
+  `thumbnail` varchar(255) DEFAULT NULL,
   `file_name` varchar(255) NOT NULL,
   `mime_type` varchar(100) NOT NULL,
   `file_size` bigint unsigned NOT NULL DEFAULT 0,
