@@ -4,6 +4,24 @@
 
         <?php $this->renderFeedbackMessages(); ?>
 
+        <form method="GET" action="<?php echo Config::get('URL'); ?>video/publicVideos" class="video-search-form">
+            <input type="text"
+                   name="search"
+                   placeholder="Search videos by title or description..."
+                   value="<?php echo htmlspecialchars($this->search_query, ENT_QUOTES, 'UTF-8'); ?>"
+                   class="video-search-input" />
+            <button type="submit" class="btn">Search</button>
+            <?php if ($this->search_query !== '') { ?>
+                <a href="<?php echo Config::get('URL'); ?>video/publicVideos" class="btn btn-secondary">Clear</a>
+            <?php } ?>
+        </form>
+
+        <?php if ($this->search_query !== '') { ?>
+            <p class="video-search-info">
+                Showing results for: <strong><?php echo htmlspecialchars($this->search_query, ENT_QUOTES, 'UTF-8'); ?></strong>
+            </p>
+        <?php } ?>
+
         <?php if ($this->published_videos) { ?>
             <div class="video-grid">
                 <?php foreach ($this->published_videos as $video) { ?>
@@ -33,7 +51,13 @@
                 <?php } ?>
             </div>
         <?php } else { ?>
-            <p>No public videos have been shared yet.</p>
+            <p>
+                <?php if ($this->search_query !== '') { ?>
+                    No videos found matching your search.
+                <?php } else { ?>
+                    No public videos have been shared yet.
+                <?php } ?>
+            </p>
         <?php } ?>
 
         <?php if (Session::userIsLoggedIn()) { ?>
