@@ -74,11 +74,10 @@
         </div>
 
         <hr />
-        <p>
-            <a href="<?php echo Config::get('URL'); ?>video/index">My Videos</a>
-            &nbsp;&middot;&nbsp;
-            <a href="<?php echo Config::get('URL'); ?>video/publicVideos">Public Videos</a>
-        </p>
+        <div class="video-nav-buttons">
+            <a href="<?php echo Config::get('URL'); ?>video/index" class="btn">My Videos</a>
+            <a href="<?php echo Config::get('URL'); ?>video/publicVideos" class="btn">Public Videos</a>
+        </div>
 
     </div>
 </div>

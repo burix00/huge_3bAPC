@@ -4,7 +4,7 @@
 
         <?php $this->renderFeedbackMessages(); ?>
 
-        <form id="videoUploadForm">
+        <form id="videoUploadForm" class="upload-form">
             <input type="hidden" id="csrf_token" value="<?php echo Csrf::makeToken(); ?>" />
 
             <p>
@@ -22,6 +22,11 @@
                 <input type="file" id="video_file" name="video_file" accept=".mp4,.webm,.ogg,video/*" required />
             </p>
 
+            <p>
+                <label for="video_thumbnail">Thumbnail image (JPEG, PNG, GIF or WebP, max 5 MB &mdash; optional):</label><br>
+                <input type="file" id="video_thumbnail" name="video_thumbnail" accept="image/*" />
+            </p>
+
             <div id="upload-progress-wrap" class="upload-progress-wrap" style="display:none;">
                 <div id="upload-progress-bar" class="upload-progress-bar"></div>
                 <span id="upload-progress-pct" class="upload-progress-pct">0%</span>
@@ -33,6 +38,11 @@
                 <input type="submit" id="upload-submit" value="Upload" />
             </p>
         </form>
+        <hr />
+        <div class="video-nav-buttons">
+            <a href="<?php echo Config::get('URL'); ?>video/index" class="btn">My Videos</a>
+            <a href="<?php echo Config::get('URL'); ?>video/publicVideos" class="btn">Public Videos</a>
+        </div>
 
     </div>
 </div>
@@ -87,6 +97,14 @@
         fd.append('video_title',        $('#video_title').val());
         fd.append('video_description',  $('#video_description').val());
         fd.append('csrf_token',         $('#csrf_token').val());
+
+        // Send thumbnail only with the first chunk
+        if (index === 0) {
+            var thumbFile = document.getElementById('video_thumbnail').files[0];
+            if (thumbFile) {
+                fd.append('video_thumbnail', thumbFile);
+            }
+        }
 
         $.ajax({
             url:         uploadUrl,

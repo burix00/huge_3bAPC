@@ -25,28 +25,36 @@
         <?php if ($this->published_videos) { ?>
             <div class="video-grid">
                 <?php foreach ($this->published_videos as $video) { ?>
-                    <div class="video-tile">
-
-                        <div class="video-info">
-                            <strong>
+                    <div class="video-card">
+                        <a href="<?php echo Config::get('URL'); ?>video/viewVideo/<?php echo (int) $video->video_id; ?>" class="video-thumbnail-link">
+                            <div class="video-thumbnail">
+                                <?php if (!empty($video->thumbnail)) { ?>
+                                    <img src="<?php echo Config::get('URL'); ?>video/thumbnail/<?php echo (int) $video->video_id; ?>"
+                                         alt="<?php echo htmlspecialchars($video->title, ENT_QUOTES, 'UTF-8'); ?>" />
+                                <?php } else { ?>
+                                    <span class="video-thumbnail-placeholder">&#9654;</span>
+                                <?php } ?>
+                            </div>
+                        </a>
+                        <div class="video-card-body">
+                            <div class="video-card-title">
                                 <a href="<?php echo Config::get('URL'); ?>video/viewVideo/<?php echo (int) $video->video_id; ?>">
                                     <?php echo htmlspecialchars($video->title, ENT_QUOTES, 'UTF-8'); ?>
                                 </a>
-                            </strong>
+                            </div>
                             <?php if (!empty($video->description)) { ?>
                                 <p class="video-description">
                                     <?php echo htmlspecialchars($video->description, ENT_QUOTES, 'UTF-8'); ?>
                                 </p>
                             <?php } ?>
-                            <span class="video-meta">
+                            <div class="video-meta">
                                 by <strong><?php echo htmlspecialchars($video->user_name, ENT_QUOTES, 'UTF-8'); ?></strong>
                                 &middot;
                                 <?php echo number_format($video->file_size / 1048576, 1); ?> MB
                                 &middot;
                                 <?php echo htmlspecialchars($video->created_at, ENT_QUOTES, 'UTF-8'); ?>
-                            </span>
+                            </div>
                         </div>
-
                     </div>
                 <?php } ?>
             </div>
@@ -62,7 +70,7 @@
 
         <?php if (Session::userIsLoggedIn()) { ?>
             <hr />
-            <p><a href="<?php echo Config::get('URL'); ?>video/index">Back to My Videos</a></p>
+            <p><a href="<?php echo Config::get('URL'); ?>video/index" class="btn">Back to My Videos</a></p>
         <?php } ?>
 
     </div>

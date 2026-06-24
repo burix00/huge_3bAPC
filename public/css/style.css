@@ -401,6 +401,14 @@ body {
 .btn-danger:hover  { background: #c9302c; }
 
 /* ── Chunked upload progress bar ─────────────────────────────────────── */
+.upload-form                { max-width: 560px; }
+.upload-form p              { margin-bottom: 16px; }
+.upload-form label          { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+.upload-form input[type="text"],
+.upload-form textarea       { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+.upload-form textarea       { resize: vertical; }
+.upload-form input[type="submit"] { margin-top: 4px; }
+
 .upload-progress-wrap {
     position: relative;
     width: 100%;
@@ -476,4 +484,50 @@ body {
 .video-search-form  { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
 .video-search-input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
 .video-search-info  { margin-bottom: 12px; font-size: 14px; color: #555; }
+
+/* -- Video Cards (YouTube-style) ------------------------------------------------------- */
+.video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+    margin-top: 12px;
+}
+.video-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 0.2s;
+}
+.video-card:hover          { box-shadow: 0 4px 14px rgba(0,0,0,0.13); }
+.video-thumbnail-link      { display: block; text-decoration: none; }
+.video-thumbnail {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+.video-thumbnail img           { width: 100%; height: 100%; object-fit: cover; display: block; }
+.video-thumbnail-placeholder   { color: #555; font-size: 2.4rem; }
+.video-card-body               { padding: 10px 12px; flex: 1; }
+.video-card-title              { font-weight: bold; margin-bottom: 4px; }
+.video-card-title a            { text-decoration: none; color: #0f0f0f; }
+.video-card-title a:hover      { color: #065fd4; }
+.video-description {
+    font-size: 13px;
+    color: #606060;
+    margin: 4px 0 6px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+.video-meta    { font-size: 12px; color: #909090; margin-top: 4px; }
+.video-actions { padding: 8px 12px 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+.video-nav-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
 
