@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS `huge`.`videos` (
   `description` text,
   `file_name` varchar(255) NOT NULL,
   `mime_type` varchar(100) NOT NULL,
-  `file_size` int(11) unsigned NOT NULL DEFAULT 0,
+  `file_size` bigint unsigned NOT NULL DEFAULT 0,
   `is_published` tinyint(1) unsigned NOT NULL DEFAULT 0,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`video_id`),
