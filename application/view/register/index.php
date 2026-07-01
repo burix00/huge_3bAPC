@@ -18,6 +18,10 @@
 
             <!-- show the captcha by calling the login/showCaptcha-method in the src attribute of the img tag -->
             
+            <!-- Google reCAPTCHA widget -->
+            <div class="g-recaptcha" data-sitekey="<?php echo Config::get('RECAPTCHA_SITE_KEY'); ?>"></div>
+            <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
             
 
             <!-- quick & dirty captcha reloader -->
